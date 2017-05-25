@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"sync"
 	"sync/atomic"
 	"unsafe"
@@ -30,6 +31,7 @@ var (
 	receivedPackets uint64     = 0
 	testDoneEvent   *sync.Cond = nil
 	passed          int32      = 1
+	rnd             *rand.Rand
 )
 
 // This part of test generates packets on port 0 and receives them on
@@ -41,7 +43,9 @@ var (
 // calculates sent/received ratio and prints it when a predefined
 // number of packets is received.
 func main() {
-	// Init YANFF system at 16 available cores
+	rnd = rand.New(rand.NewSource(13))
+
+		// Init YANFF system at 16 available cores
 	flow.SystemInit(16)
 
 	var m sync.Mutex
@@ -50,10 +54,10 @@ func main() {
 	// Create packets with speed at least 1000 packets/s
 	firstFlow := flow.SetGenerator(generatePacket, 1000)
 	// Send all generated packets to the output
-	flow.SetSender(firstFlow, 0)
+	flow.SetSender(firstFlow, 1)
 
 	// Create receiving flow and set a checking function for it
-	secondFlow := flow.SetReceiver(1)
+	secondFlow := flow.SetReceiver(0)
 	flow.SetHandler(secondFlow, checkPackets)
 	flow.SetStopper(secondFlow)
 
@@ -84,13 +88,23 @@ func main() {
 func generatePacket(emptyPacket *packet.Packet) {
 	packet.InitEmptyEtherIPv4UDPPacket(emptyPacket, uint(PACKET_SIZE))
 
-	emptyPacket.Ether.DAddr = [6]uint8{0xde, 0xad, 0xbe, 0xaf, 0xff, 0xfe}
+	emptyPacket.Ether.DAddr = [6]uint8{0xde, 0xad, 0xbe, 0xef, 0xff, 0xfe}
+	emptyPacket.Ether.SAddr = [6]uint8{0x11, 0x22, 0x33, 0x44, 0x55, 0x66}
 
 	sent := atomic.LoadUint64(&sentPackets)
 	ptr := (*common.Packetdata)(emptyPacket.Data)
 	// Put a unique non-zero value here
-	ptr.F1 = sent + 1
-	ptr.F2 = 0
+	ptr.F1 = rnd.Uint64() + sent + 1
+	ptr.F2 = rnd.Uint64()
+
+	emptyPacket.IPv4.HdrChecksum = 0
+	emptyPacket.IPv4.SrcAddr = packet.SwapBytesUint32((192 << 24) | (168 << 16) | (1 << 8) | 1)
+	emptyPacket.IPv4.DstAddr = packet.SwapBytesUint32((192 << 24) | (168 << 16) | (1 << 8) | 2)
+	emptyPacket.IPv4.TimeToLive = 100
+	emptyPacket.UDP.SrcPort = packet.SwapBytesUint16(1234)
+	emptyPacket.UDP.DstPort = packet.SwapBytesUint16(2345)
+	emptyPacket.UDP.DgramLen = packet.SwapBytesUint16(uint16(PACKET_SIZE))
+	emptyPacket.CalculateUDPv4Checksum()
 
 	atomic.AddUint64(&sentPackets, 1)
 }

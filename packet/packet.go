@@ -648,6 +648,44 @@ func InitEmptyEtherIPv4UDPPacket(packet *Packet, plSize uint) {
 	packet.IPv4.VersionIhl = 0x45 // Ipv4, IHL = 5 (min header len)
 	packet.IPv4.TotalLength = SwapBytesUint16(uint16(IPv4MinLen + UDPLen + plSize))
 	packet.UDP.DgramLen = uint16(UDPLen + plSize)
+
+//	low.SetTXUDPOLFlags(packet.CMbuf, EtherLen, IPv4MinLen)
+}
+
+func (packet *Packet) CalculateUDPv4Checksum() {
+	var sum uint32 = 0
+	hdr := packet.IPv4
+	uptr := uintptr(packet.Data)
+	uptr -= UDPLen
+	packet.UDP.DgramCksum = 0
+	dataLength := SwapBytesUint16(hdr.TotalLength) - IPv4MinLen
+
+	for i := uintptr(0); i < uintptr(dataLength - UDPLen); i += 2 {
+		sum += uint32(SwapBytesUint16(*(*uint16)(unsafe.Pointer(uptr + i))))
+		fmt.Printf("data = 0x%04x, sum = 0x%x\n", uint32(SwapBytesUint16(*(*uint16)(unsafe.Pointer(uptr + i)))), sum)
+	}
+
+	sum += uint32(SwapBytesUint16(uint16(hdr.SrcAddr >> 16))) +
+		uint32(SwapBytesUint16(uint16(hdr.SrcAddr))) +
+		uint32(SwapBytesUint16(uint16(hdr.DstAddr >> 16))) +
+		uint32(SwapBytesUint16(uint16(hdr.DstAddr))) +
+		uint32(hdr.NextProtoID) +
+		uint32(dataLength - UDPLen)
+
+	fmt.Printf("0x%04x + 0x%04x + 0x%04x + 0x%04x + 0x%04x + 0x%04x = %x\n",
+		uint32(SwapBytesUint16(uint16(hdr.SrcAddr >> 16))),
+		uint32(SwapBytesUint16(uint16(hdr.SrcAddr))),
+		uint32(SwapBytesUint16(uint16(hdr.DstAddr >> 16))),
+		uint32(SwapBytesUint16(uint16(hdr.DstAddr))),
+		uint32(hdr.NextProtoID),
+		uint32(dataLength - UDPLen),
+		sum)
+
+	for sum > 0xffff {
+		sum = (sum >> 16) + (sum & 0xffff)
+	}
+
+	packet.UDP.DgramCksum = SwapBytesUint16(uint16(^sum))
 }
 
 // InitEmptyEtherIPv6TCPPacket initializes input packet with preallocated plSize of bytes for payload

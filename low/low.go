@@ -95,6 +95,19 @@ func TrimMbuf(m *Mbuf, length uint) bool {
 	return true
 }
 
+func SetTXUDPOLFlags(mb *Mbuf, l2len, l3len uint32) {
+	// PKT_TX_UDP_CKSUM | PKT_TX_IP_CKSUM | PKT_TX_IPV4
+	mb.ol_flags = (3 << 52) | (1 << 54) | (1 << 55)
+	mb.anon3[0] = uint8((l2len & 0x7f) | ((l3len & 1) << 7))
+	mb.anon3[1] = uint8(l3len >> 1)
+	mb.anon3[2] = 0
+	mb.anon3[3] = 0
+	mb.anon3[4] = 0
+	mb.anon3[5] = 0
+	mb.anon3[6] = 0
+	mb.anon3[7] = 0
+}
+
 // These constants are used by packet package to parse protocol headers
 const (
 	RTE_PTYPE_L2_ETHER = C.RTE_PTYPE_L2_ETHER

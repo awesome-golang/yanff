@@ -10,6 +10,8 @@ include $(PATH_TO_MK)/leaf.mk
 # Main DPDK variables
 DEST_DPDK_DIR=$(RTE_TARGET)-install
 export WORKDIR=/workdir
+# Uncomment to build DEBUG DPDK
+EXTRA_CFLAGS = -g -O0
 
 # Pktgen variables
 PKTGEN_VERSION=3.1.0

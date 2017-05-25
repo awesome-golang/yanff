@@ -11,6 +11,8 @@ DPDK_DIR = dpdk-$(DPDK_VERSION)
 export RTE_SDK = $(PROJECT_ROOT)/test/dpdk/$(DPDK_DIR)
 export RTE_TARGET = x86_64-native-linuxapp-gcc
 export CGO_CFLAGS = -I$(RTE_SDK)/$(RTE_TARGET)/include
+# DEBUG flags
+export CGO_CFLAGS = -g -O0 -I$(RTE_SDK)/$(RTE_TARGET)/include
 export CGO_LDFLAGS = -L$(RTE_SDK)/$(RTE_TARGET)/lib
 
 # Universal check whether a variable is set
